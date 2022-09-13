@@ -3,10 +3,11 @@ const responseSchema = require("../utils/response");
 const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken");
 const Joi = require("@hapi/joi");
+const verifyToken = require("../middleware/verifyToken");
+const { ROLES } = require("./Roles");
 
-const tokenList = {};
 
-const validationSchema = Joi.object({
+const UserValidationSchema = Joi.object({
     name: Joi.string().min(6).required(),
     email: Joi.string().required().email(),
     password: Joi.string().min(6).required()
@@ -19,11 +20,8 @@ const loginValidationSchema = Joi.object({
 });
 
 
-const registerUser = async (req, res) => {
+const registerUserController = async (req, res) => {
     //Checking if user email already exists
-
-
-    console.log(req.body)
     const email = await Models.user.findOne({ email: req.body.email });
     if (email) {
         res.status(400).json(responseSchema(400, null, "User Email Already Exists"))
@@ -31,36 +29,26 @@ const registerUser = async (req, res) => {
     }
     //password hashing
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(req.body.password, salt)
-
+    const hashedPassword = await bcrypt.hash(req.body.password, salt);
     const user = new Models.user({
         name: req.body.name,
         email: req.body.email,
-        password: hashedPassword
+        password: hashedPassword,
+        image: req.file?.filename,
+        roles:[ROLES.USER]
     });
-    try {
-        const { error } = await validationSchema.validateAsync(req.body);
-        if (error) {
-            console.log(error.details[0].message)
-            res.status(400).json(responseSchema(400, null, error.details[0].message));
-            return;
-        }
-        else {
-            const addUser = await user.save();
-            res.status(200).json(responseSchema(200, addUser, "Registration Successful"))
-        }
+    const { error } = await UserValidationSchema.validateAsync(req.body);
+    if (error) {
+        res.status(400).json(responseSchema(400, null, error.details[0].message));
     }
-    catch (error) {
-        console.log(error)
-        res.status(500).json(responseSchema(500, null, error.message))
-    }
-
+    const addUser = await user.save();
+    res.status(200).json(responseSchema(200, addUser, "Registration Successful"))
 }
 
 
 
 
-const loginUser = async (req, res) => {
+const loginUserController = async (req, res) => {
     const user = await Models.user.findOne({ email: req.body.email })
     if (!user) return res.status(400).json(responseSchema(400, null, "User Not Found"));
 
@@ -75,36 +63,22 @@ const loginUser = async (req, res) => {
             res.status(400).json(responseSchema(400, null, error.details[0].message));
         }
         else {
-            const token = jwt.sign({ _id: user._id }, process.env.TOKEN_SECRET, { expiresIn: process.env.JWT_EXPIRATION });
-            const refreshToken = jwt.sign({ _id: user._id }, config.refreshTokenSecret, { expiresIn: process.env.JWT_REFRESH_EXPIRATION })
-            tokenList[refreshToken] = response
-            res.status(200).json(responseSchema(200, { "token": token, "refreshToken": refreshToken }, "Logged in successfully"));
-        }
-    }
-    catch (error) {
-        res.status(500).json(responseSchema(500, null, error.message))
-    }
-}
-
-
-
-const tokenRefresh = async (req, res) => {
-
-    const data = req.body
-
-    if (!data.refreshToken) return res.status(400).json(responseSchema(400, null, "Refresh token not found"))
-
-    try {
-        if (data.refreshToken && data.refreshToken in tokenList) {
-            const user = {
-
+            let userData = {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                photo: "/public/uploads/" + user.image,
+                roles: user.roles
             }
-            const token = jwt.sign({ _id: user._id }, process.env.TOKEN_SECRET, { expiresIn: process.env.JWT_EXPIRATION });
-            const refreshToken = jwt.sign({ _id: user._id }, config.refreshTokenSecret, { expiresIn: process.env.JWT_REFRESH_EXPIRATION })
-            tokenList[refreshToken] = response
+            const token = jwt.sign(userData, process.env.TOKEN_SECRET, { expiresIn: process.env.JWT_EXPIRATION });
+            const refreshToken = jwt.sign(userData, process.env.TOKEN_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRATION })
+            res.cookie("accessToken", token, {
+                maxAge: 24 * 60 * 60 * 1000,
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production" ? true : false,
+              })
             res.status(200).json(responseSchema(200, { "token": token, "refreshToken": refreshToken }, "Logged in successfully"));
         }
-
     }
     catch (error) {
         res.status(500).json(responseSchema(500, null, error.message))
@@ -112,10 +86,51 @@ const tokenRefresh = async (req, res) => {
 }
 
 
-const user = {
-    "registerUser": registerUser,
-    "loginUser": loginUser
 
+const tokenRefreshController = async (req, res) => {
+    const { refreshToken, id } = req.body;
+    const isValid = verifyToken(id, refreshToken);
+
+    if (!refreshToken) return res.status(400).json(responseSchema(400, null, "Refresh token not found"))
+    if (!isValid) return res.status(401).json(responseSchema(400, null, "Invalid Token"))
+    const user = await Models.user.findOne({ _id: req.body.id });
+    let userData = {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        photo: "/public/uploads/" + user.image,
+        roles: user.roles
+    }
+    const token = jwt.sign(userData, process.env.TOKEN_SECRET, { expiresIn: process.env.JWT_EXPIRATION });
+    res.cookie("accessToken", token, {
+        maxAge: 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production" ? true : false,
+      })
+    res.status(200).json(responseSchema(200, { "token": token }, "Access token fetched"));
 }
 
-module.exports = user
+
+const getAllUsers = async (req,res)=>{
+    try {
+        const data = await Models.user.find();
+        res.status(200).json(responseSchema(200, data, "Users Fetched Successfully"))
+    }
+    catch (error) {
+        res.status(500).json(responseSchema(500, null, error.message))
+    }
+}
+
+const logout = async (req,res)=>{
+    try {
+        res.cookie("accessToken", "", { expires: new Date(0) });
+        req.logout();
+        res.status(200).json(responseSchema(200, null, "Logged Out Successfully"))
+    }
+    catch (error) {
+        res.status(500).json(responseSchema(500, null, error.message))
+    }
+ 
+};
+
+module.exports = {logout,getAllUsers, tokenRefreshController, registerUserController, loginUserController, UserValidationSchema }

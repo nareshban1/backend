@@ -8,7 +8,7 @@ const getAllProjects = async (req, res) => {
         res.status(200).json(responseSchema(200, data, "Projects Fetched Successfully"))
     }
     catch (error) {
-        res.status(500).json(responseSchema(500, [], error.message))
+        res.status(500).json(responseSchema(500, null, error.message))
     }
 }
 
