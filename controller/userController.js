@@ -35,7 +35,7 @@ const registerUserController = async (req, res) => {
         email: req.body.email,
         password: hashedPassword,
         image: req.file?.filename,
-        roles:[]
+        roles:req.body.roles
     });
     const { error } = await UserValidationSchema.validateAsync(req.body);
     if (error) {
