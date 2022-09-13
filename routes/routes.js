@@ -21,5 +21,25 @@ routes.post("/refresh-token", controller.user.tokenRefreshController)
 routes.get("/all-users", controller.user.getAllUsers )
 routes.get("/logout", controller.user.logout )
 
-//image upload
+//roles routes 
+routes.get("/roles/all",  controller.role.getAllRoles)
+routes.post("/roles/add", controller.role.addRole)
+routes.put("/roles/update/:id", controller.role.updateRole)
+routes.delete("/roles/delete/:id", controller.role.deleteRole)
+
+
+
+//module routes 
+routes.get("/module/all",  controller.modules.getAllModules)
+routes.post("/module/add", controller.modules.addModules)
+routes.put("/module/update/:id", controller.modules.updateModules)
+routes.delete("/module/delete/:id", controller.modules.deleteModules)
+
+
+//Permissions routes 
+routes.get("/permissions/all",  controller.permissions.getAllPermissions)
+routes.get("/permissions/user",  controller.permissions.getUserPermissions)
+routes.post("/permissions/add", controller.permissions.addPermission)
+routes.put("/permissions/update/:id", controller.permissions.updatePermission)
+routes.delete("/permissions/delete/:id", controller.permissions.deletePermission)
 module.exports = routes

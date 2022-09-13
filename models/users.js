@@ -23,10 +23,12 @@ const userSchema = new mongoose.Schema({
     image:{
      type:String,
     },
-    roles:{
-      type: Array,
-      required:true,
-    }
+    roles: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Role"
+      }
+    ]
 })
 
 module.exports = mongoose.model('User', userSchema)

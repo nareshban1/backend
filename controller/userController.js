@@ -4,7 +4,7 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken");
 const Joi = require("@hapi/joi");
 const verifyToken = require("../middleware/verifyToken");
-const { ROLES } = require("./Roles");
+const { ROLES } = require("./roleController");
 
 
 const UserValidationSchema = Joi.object({
@@ -35,7 +35,7 @@ const registerUserController = async (req, res) => {
         email: req.body.email,
         password: hashedPassword,
         image: req.file?.filename,
-        roles:[ROLES.USER]
+        roles:[]
     });
     const { error } = await UserValidationSchema.validateAsync(req.body);
     if (error) {
