@@ -14,9 +14,15 @@ const getAllModules = async (req, res) => {
 
 
 const addModules = async (req, res) => {
+    const name = await Models.module.findOne({ name: req.body.name });
+    if (name) {
+        res.status(400).json(responseSchema(400, null, "Module Already Exists"))
+        return;
+    }
     const data = new Models.module({
         name: req.body.name,
     })
+   
     try {
         const saveData = await data.save();
         res.status(200).json(responseSchema(200, saveData, "Modules Saved Successfully"))

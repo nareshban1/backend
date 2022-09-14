@@ -1,6 +1,6 @@
 const Models = require("../models/models");
 const responseSchema = require("../utils/response");
-
+const jwt = require("jsonwebtoken");
 
 const getAllPermissions = async (req, res) => {
     try {
@@ -14,27 +14,33 @@ const getAllPermissions = async (req, res) => {
 
 
 const addPermission = async (req, res) => {
+    console.log(req.body)
     const {
-        role_id,
-        role_name,
-        module_id,
-        module_name,
+        roleId,
+        roleName,
+        moduleId,
+        moduleName,
         allowCreate,
         allowUpdate,
-        allowRead, 
+        allowRead,
         allowDelete
     } = req.body
     const data = new Models.permission({
-        module_id: module_id,
-        module_name: module_name,
-        role_id: role_id,
-        role_name:role_name,
-        create:allowCreate,
+        module_id: moduleId,
+        module_name: moduleName,
+        role_id: roleId,
+        role_name: roleName,
+        create: allowCreate,
         delete: allowDelete,
         read: allowRead,
         update: allowUpdate,
-       
+
     })
+    const mapping = await Models.module.findOne({ role_id: roleId, module_id: moduleId });
+    if (mapping) {
+        res.status(400).json(responseSchema(400, null, "Permissions Already Exists"))
+        return;
+    }
     try {
         const saveData = await data.save();
         res.status(200).json(responseSchema(200, saveData, "Permission Saved Successfully"))
@@ -58,19 +64,19 @@ const updatePermission = async (req, res) => {
             module_name,
             allowCreate,
             allowUpdate,
-            allowRead, 
+            allowRead,
             allowDelete
         } = req.body
         const data = {
             module_id: module_id,
             module_name: module_name,
             role_id: role_id,
-            role_name:role_name,
-            create:allowCreate,
+            role_name: role_name,
+            create: allowCreate,
             delete: allowDelete,
             read: allowRead,
             update: allowUpdate,
-           
+
         }
         const updateData = await Models.permission.findByIdAndUpdate(req.params.id, { ...data }, { new: true, runValidators: true })
         console.log(updateData)
@@ -97,17 +103,34 @@ const deletePermission = async (req, res) => {
     }
 }
 
-const getUserPermissions = async (req, res)=>{
+const getUserPermissions = async (req, res) => {
     let token = req.get("authorization");
     if (!token) {
         return res.status(404).json(responseSchema(404, null, "Token not found"));
     }
-    token = token.split("")[1];
-    const decoded = jwt.verify(token, process.env.TOKEN_SECRET)
-    console.log(decoded)
+    token = token.replace('Bearer ', '')
+
     try {
-        const permissions = await Models.permission.find({ role_id: req.user.role_id });
-        res.status(200).json(responseSchema(200, permissions, "Permission fetched Successfully"))
+        const decoded = jwt.verify(token, process.env.TOKEN_SECRET)
+        const permissions = await Models.permission.find({ role_id: [...decoded.roles.map((role) => role.id)] });
+        let result = [];
+        permissions.forEach(elem => {
+            let match = result.find(r => r.module_name == elem.module_name);
+
+            if (match) {
+                const newData = {
+                    ...match,
+                    create: !!match.create || !!elem.create,
+                    delete: !!match.delete || !!elem.delete,
+                    update: !!match.update || !!elem.update,
+                    read: !!match.read || !!elem.read,
+                }
+                Object.assign(match, newData);
+            } else {
+                result.push(elem);
+            }
+        });
+        res.status(200).json(responseSchema(200, result, "Permission fetched Successfully"))
     }
     catch (error) {
         res.status(500).json(responseSchema(500, null, error.message))
@@ -119,4 +142,4 @@ const getUserPermissions = async (req, res)=>{
 
 
 
-module.exports = {getAllPermissions,deletePermission,updatePermission,addPermission,getUserPermissions}
+module.exports = { getAllPermissions, deletePermission, updatePermission, addPermission, getUserPermissions }

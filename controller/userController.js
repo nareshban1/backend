@@ -10,7 +10,8 @@ const { ROLES } = require("./roleController");
 const UserValidationSchema = Joi.object({
     name: Joi.string().min(6).required(),
     email: Joi.string().required().email(),
-    password: Joi.string().min(6).required()
+    password: Joi.string().min(6).required(),
+    roles:Joi.array().required()
 });
 
 
@@ -22,6 +23,7 @@ const loginValidationSchema = Joi.object({
 
 const registerUserController = async (req, res) => {
     //Checking if user email already exists
+   
     const email = await Models.user.findOne({ email: req.body.email });
     if (email) {
         res.status(400).json(responseSchema(400, null, "User Email Already Exists"))
@@ -29,7 +31,9 @@ const registerUserController = async (req, res) => {
     }
     //password hashing
     const salt = await bcrypt.genSalt(10);
+    console.log(req.body)
     const hashedPassword = await bcrypt.hash(req.body.password, salt);
+    
     const user = new Models.user({
         name: req.body.name,
         email: req.body.email,
@@ -37,12 +41,17 @@ const registerUserController = async (req, res) => {
         image: req.file?.filename,
         roles:req.body.roles
     });
+    try {
     const { error } = await UserValidationSchema.validateAsync(req.body);
     if (error) {
         res.status(400).json(responseSchema(400, null, error.details[0].message));
     }
     const addUser = await user.save();
     res.status(200).json(responseSchema(200, addUser, "Registration Successful"))
+    }
+    catch (error) {
+        res.status(500).json(responseSchema(500, null, error.message))
+    }
 }
 
 
@@ -72,11 +81,7 @@ const loginUserController = async (req, res) => {
             }
             const token = jwt.sign(userData, process.env.TOKEN_SECRET, { expiresIn: process.env.JWT_EXPIRATION });
             const refreshToken = jwt.sign(userData, process.env.TOKEN_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRATION })
-            res.cookie("accessToken", token, {
-                maxAge: 24 * 60 * 60 * 1000,
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production" ? true : false,
-              })
+
             res.status(200).json(responseSchema(200, { "token": token, "refreshToken": refreshToken }, "Logged in successfully"));
         }
     }

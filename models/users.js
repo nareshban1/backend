@@ -25,7 +25,9 @@ const userSchema = new mongoose.Schema({
     },
     roles: [
       {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
+        name:String,
+        id:String,
         ref: "Role"
       }
     ]
