@@ -1,7 +1,8 @@
+require("dotenv").config({path:"./.env"})
 const express = require("express");
 const connect = require("./database")
 const routes = require("./routes/routes")
-require("dotenv").config({path:"./.env"})
+
 const bodyParser= require("body-parser")
 const path=require("path");
 const cors = require("cors");
