@@ -20,7 +20,8 @@ routes.post("/login", controller.user.loginUserController)
 routes.post("/refresh-token", controller.user.tokenRefreshController)
 routes.get("/all-users", controller.user.getAllUsers )
 routes.get("/logout", controller.user.logout )
-
+routes.post("/verify-email", controller.user.verifyEmail)
+routes.post("/request-verify", controller.user.requestVerification)
 //roles routes 
 routes.get("/roles/all",  controller.role.getAllRoles)
 routes.post("/roles/add", controller.role.addRole)

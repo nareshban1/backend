@@ -6,6 +6,7 @@ const Joi = require("@hapi/joi");
 const verifyToken = require("../middleware/verifyToken");
 const { ROLES } = require("./roleController");
 const transporter = require("../utils/transporter");
+const { use } = require("../utils/transporter");
 
 
 
@@ -38,7 +39,6 @@ const registerUserController = async (req, res) => {
     }
     //password hashing
     const salt = await bcrypt.genSalt(10);
-    console.log(req.body)
     const hashedPassword = await bcrypt.hash(req.body.password, salt);
 
     const user = new Models.user({
@@ -54,8 +54,7 @@ const registerUserController = async (req, res) => {
             res.status(400).json(responseSchema(400, null, error.details[0].message));
         }
         const addUser = await user.save();
-        console.log(addUser)
-        const token = jwt.sign({userId: addUser._id}, process.env.TOKEN_SECRET, { expiresIn: process.env.JWT_EXPIRATION });
+        const token = jwt.sign({userId: addUser._id}, process.env.TOKEN_SECRET, { expiresIn: process.env.VERIFY_EMAIL_EXPIRATION });
         let verifyLink = process.env.WEBSITE + "#/verify-email/"+ token
         const mailData = {
             from: process.env.EMAIL,  
@@ -88,6 +87,7 @@ const registerUserController = async (req, res) => {
 const loginUserController = async (req, res) => {
     const user = await Models.user.findOne({ email: req.body.email })
     if (!user) return res.status(400).json(responseSchema(400, null, "User Not Found"));
+    if (!user.isActive) return res.status(400).json(responseSchema(400, null, "Verify your email."));
 
     //check password match
     const validPassword = await bcrypt.compare(req.body.password, user.password);
@@ -119,6 +119,55 @@ const loginUserController = async (req, res) => {
     }
 }
 
+const verifyEmail = async (req, res) => {
+    const { userId } = req.body;
+    const user = await Models.user.findOne({ _id: userId })
+    if (!user) return res.status(400).json(responseSchema(400, null, "User Not Found"));
+    if(user.isActive) return res.status(400).json(responseSchema(400, null, "User Email Already verified"));
+
+    try {
+        const updateData = await Models.user.findByIdAndUpdate(userId,{isActive:true } , { new: true, runValidators: true })
+        res.status(200).json(responseSchema(200, null, "User Email Verified Successfully"))
+    }
+    catch (error) {
+        res.status(500).json(responseSchema(500, null, error.message))
+    }
+
+}
+
+const requestVerification = async (req, res) => {
+    const { email } = req.body;
+    const user = await Models.user.findOne({ email: email })
+    if (!user) return res.status(400).json(responseSchema(400, null, "User with Email Not Found"));
+    if(user.isActive) return res.status(400).json(responseSchema(400, null, "User Email Already verified"));
+
+    try {
+        const token = jwt.sign({userId: user._id}, process.env.TOKEN_SECRET, { expiresIn: process.env.VERIFY_EMAIL_EXPIRATION });
+        let verifyLink = process.env.WEBSITE + "#/verify-email/"+ token
+        const mailData = {
+            from: process.env.EMAIL,  
+            to: user.email,
+            subject: 'Verify your email!!',
+            template: 'verifyemail', 
+            context:{
+                name: user.name, 
+                verifyLink:verifyLink
+            }
+        };
+
+        transporter.sendMail(mailData, function (err, info) {
+            if(err)
+           { console.log(err)
+            res.status(500).json(responseSchema(500, null, "Error sending email. Please login to verify email."))}
+            else
+            res.status(200).json(responseSchema(200, user, "Email Verification Link Sent"))
+         });
+    }
+    catch (error) {
+        res.status(500).json(responseSchema(500, null, error.message))
+    }
+
+}
 
 
 const tokenRefreshController = async (req, res) => {
@@ -169,4 +218,4 @@ const logout = async (req, res) => {
 
 };
 
-module.exports = { logout, getAllUsers, tokenRefreshController, registerUserController, loginUserController, UserValidationSchema }
+module.exports = { logout, getAllUsers, tokenRefreshController, registerUserController, requestVerification,loginUserController, UserValidationSchema,verifyEmail }
