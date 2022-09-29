@@ -1,14 +1,13 @@
 const jwt = require("jsonwebtoken");
-const verifyToken =(userId, token)=>{
+const decodeToken =( token)=>{
     try{
         const decoded = jwt.verify(token, process.env.TOKEN_SECRET);
-        console.log(decoded.id, userId)
-        return decoded.id === userId;
+        return decoded
     }
     catch(error){
         console.log(error)
-        return false;
+        return {};
     }
 }
 
-module.exports = verifyToken
+module.exports = decodeToken
