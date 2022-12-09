@@ -22,8 +22,8 @@ routes.get("/all-users", controller.user.getAllUsers )
 routes.get("/logout", controller.user.logout )
 routes.post("/verify-email", controller.user.verifyEmail)
 routes.post("/request-verify", controller.user.requestVerification)
-routes.post("/request-password-reset", controller.user.requestPasswordChange)
-routes.post("/change-password", controller.user.resetPassword)
+routes.post("/request-password-change", controller.user.requestPasswordChange)
+routes.post("/reset-password", controller.user.resetPassword)
 
 //roles routes 
 routes.get("/roles/all",  controller.role.getAllRoles)
